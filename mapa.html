@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeModa - Principal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Chau+Philomene+One&family=Nunito&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="main-screen">
+    <header>
+      DeModa
+      <button class="cerrar">Cerrar sesión</button>
+    </header>
+
+    <div class="main-content">
+      <div class="botones">
+        <img src="https://img.icons8.com/ios-filled/50/000000/clothes.png" width="40" />
+        <button>Seleccionar conjunto</button>
+        <div class="ubicacion">
+          <input type="number" id="hour" min="0" max="23" value="12" />
+          <button onclick="mostrarMapa()">Seleccionar ubicación</button>
+        </div>
+      </div>
+
+      <div class="outfits" id="outfitContainer">
+        <div class="outfit mas" onclick="abrirSelectorImagen()"><span>+</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mapa-contenedor oculto" id="mapaContenedor">
+    <div id="map"></div>
+    <div id="weatherCard" class="weather-card">Clima: ______</div>
+    <button id="establecerUbicacion">Establecer ubicación</button>
+  </div>
+
+  <!-- Input para cargar archivo -->
+  <input 
+    type="file" 
+    id="inputImagen" 
+    accept="image/*" 
+    capture="environment" 
+    style="display: none;" 
+  />
+
+  <!-- Popup para opciones -->
+  <div class="popup-opciones oculto" id="popupOpciones">
+    <button onclick="usarArchivo()">Agregar archivo</button>
+    <button onclick="iniciarCamara()">Tomar foto</button>
+  </div>
+
+  <!-- Vista cámara -->
+  <div class="camara-contenedor oculto" id="camaraContenedor">
+    <video id="video" autoplay></video>
+    <button onclick="capturarFoto()">Capturar</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+
+</body>
+</html>
