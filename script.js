@@ -1,6 +1,7 @@
 let map, marker = null;
 let coordsSeleccionadas = null;
 let stream;
+let outfitSeleccionado = null;
 
 // 📷 ABRIR MENÚ DE OPCIONES DE IMAGEN
 function abrirSelectorImagen() {
@@ -128,4 +129,16 @@ document.getElementById("establecerUbicacion").addEventListener("click", () => {
   }
   alert(`Ubicación guardada: ${coordsSeleccionadas.lat.toFixed(4)}, ${coordsSeleccionadas.lng.toFixed(4)}`);
   document.getElementById("mapaContenedor").classList.remove("visible");
+});
+
+// 🧑‍💻 SELECCIONAR IMAGEN POR TECLADO
+document.addEventListener("keydown", (e) => {
+  const key = e.key; // Captura el número de tecla presionado
+  const imagenes = document.querySelectorAll(".outfit");
+  const numeroImagen = parseInt(key);
+
+  if (!isNaN(numeroImagen) && numeroImagen <= imagenes.length) {
+    imagenes.forEach(img => img.classList.remove("seleccionado"));
+    imagenes[numeroImagen - 1].classList.add("seleccionado");
+  }
 });
