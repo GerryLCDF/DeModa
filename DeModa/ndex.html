@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeModa - Principal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Chau+Philomene+One&family=Nunito&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- Header separado arriba -->
+  <header class="main-header">
+    <img src="logo.png" alt="Logo DeModa" class="logo" />
+    <h1>DeModa</h1>
+    <button class="cerrar">Cerrar sesión</button>
+  </header>
+
+  <div class="container">
+    <main>
+      <section class="carousel-container">
+        <div id="carousel" class="carousel">
+          <div class="carousel-item mas" id="add-image-btn"><span>+</span></div>
+          <!-- Las imágenes se agregan dinámicamente -->
+        </div>
+      </section>
+
+      <section class="buttons">
+        <button onclick="abrirSelectorImagen()">Agregar más</button>
+        <button onclick="mostrarMapa()">Abrir Mapa</button>
+        <button id="btnEnviarOutfits">Mandar Outfits</button>
+      </section>
+
+      <section id="resultadosAPI" class="resultados"></section>
+    </main>
+  </div>
+
+  <!-- Popup opciones agregar imagen -->
+  <div class="popup-opciones oculto" id="popupOpciones">
+    <button onclick="usarArchivo()">Agregar archivo</button>
+    <button onclick="iniciarCamara()">Tomar foto</button>
+  </div>
+
+  <!-- Cámara -->
+  <div class="camara-contenedor oculto" id="camaraContenedor">
+    <video id="video" autoplay></video>
+    <button onclick="capturarFoto()">Capturar</button>
+  </div>
+
+  <!-- Mapa -->
+  <div class="mapa-contenedor oculto" id="mapaContenedor">
+    <div id="map"></div>
+    <div id="weatherCard" class="weather-card">Clima: ______</div>
+    <button id="establecerUbicacion">Establecer ubicación</button>
+  </div>
+
+  <!-- Input oculto para archivos -->
+  <input type="file" id="inputImagen" accept="image/*" capture="environment" style="display: none;" />
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
