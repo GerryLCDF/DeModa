@@ -1,15 +1,9 @@
-let map, marker = null;
-let coordsSeleccionadas = null;
-let stream;
-let textoCompleto = `Se recomienda el uso de este outfit, ya que presenta un conjunto más ligero en comparación con los otros, que son más cargados. Además, este es perfecto porque el lugar al que te diriges presenta un clima templado y despejado. Se aconseja no sobrecargar el look con accesorios. También se recomienda el uso del bolso que se muestra en el tercer outfit.`;
-
-// URL de tu función en Google Cloud Function (cambia por la URL real)
-const URL_API = "https://us-central1-tu-proyecto.cloudfunctions.net/analizar_outfit";
-
-// Referencia al carrusel
 const carousel = document.getElementById("carousel");
+const popupOpciones = document.getElementById("popupOpciones");
+const API_UPLOAD_URL = "http://localhost:3000/upload";
+const API_LIST_URL = "http://localhost:3000/images";
+const URL_API = "TU_API_KEY_AQUI"; // Cambia por tu API real
 
-// Función para posicionar carrusel centrado en índice seleccionado
 function posicionarCarrusel(indiceSeleccionado = null) {
   const items = carousel.querySelectorAll(".carousel-item");
   const count = items.length;
@@ -24,7 +18,7 @@ function posicionarCarrusel(indiceSeleccionado = null) {
     const absOffset = Math.abs(offset);
 
     if (offset === 0) {
-      item.style.transform = `translateX(0px) translateZ(100px) rotateY(0deg) scale(1.1)`;
+      item.style.transform = "translateX(0px) translateZ(100px) rotateY(0deg) scale(1.1)";
       item.style.zIndex = 1000;
       item.style.opacity = 1;
     } else if (absOffset <= 3) {
@@ -37,20 +31,23 @@ function posicionarCarrusel(indiceSeleccionado = null) {
       item.style.zIndex = zIndex;
       item.style.opacity = 1;
     } else {
-      item.style.transform = `translateX(0px) translateZ(-200px)`;
+      item.style.transform = "translateX(0px) translateZ(-200px)";
       item.style.opacity = 0;
       item.style.zIndex = 0;
     }
   });
 }
 
-// Agregar imagen al carrusel con evento para centrar al hacer click
 function agregarImagenCarrusel(url) {
   const nuevoDiv = document.createElement("div");
   nuevoDiv.classList.add("carousel-item");
 
+  const imgContainer = document.createElement("div");
+  imgContainer.classList.add("img-container");
+
   const img = document.createElement("img");
   img.src = url;
+  img.alt = "Outfit";
 
   img.onclick = () => {
     const items = Array.from(carousel.querySelectorAll(".carousel-item"));
@@ -58,159 +55,134 @@ function agregarImagenCarrusel(url) {
     posicionarCarrusel(idx);
   };
 
-  nuevoDiv.appendChild(img);
+  imgContainer.appendChild(img);
+
+  // Barra inferior con botón eliminar
+  const deleteBar = document.createElement("div");
+  deleteBar.classList.add("delete-bar");
+
+  const btnEliminar = document.createElement("button");
+  btnEliminar.textContent = "X";
+
+  btnEliminar.onclick = async (event) => {
+    event.stopPropagation();
+    if (!confirm("¿Eliminar esta imagen?")) return;
+
+    const filename = url.split("/").pop();
+
+    try {
+      const resp = await fetch(`http://localhost:3000/delete/${filename}`, {
+        method: "DELETE",
+      });
+      if (!resp.ok) {
+        alert("Error al eliminar la imagen en servidor");
+        return;
+      }
+      nuevoDiv.remove();
+      posicionarCarrusel();
+    } catch (error) {
+      alert("Error al eliminar la imagen: " + error.message);
+    }
+  };
+
+  deleteBar.appendChild(btnEliminar);
+  nuevoDiv.appendChild(imgContainer);
+  nuevoDiv.appendChild(deleteBar);
 
   const btnAgregar = document.getElementById("add-image-btn");
   carousel.insertBefore(nuevoDiv, btnAgregar);
 
-  posicionarCarrusel(); // centra al medio
+  posicionarCarrusel();
 }
 
-// Evento click en "+" para abrir menú opciones
+function abrirSelectorImagen() {
+  popupOpciones.classList.remove("oculto");
+}
+
 document.getElementById("add-image-btn").onclick = abrirSelectorImagen;
 
-// Evento click en botón "Agregar más" para abrir menú opciones
-const botonAgregarMas = document.querySelector('button[onclick="abrirSelectorImagen()"]');
-if (botonAgregarMas) {
-  botonAgregarMas.onclick = abrirSelectorImagen;
-}
-
-// Cerrar popup si se hace click fuera de él (salvo botones que abren popup)
-document.addEventListener("click", function(event) {
-  const popup = document.getElementById("popupOpciones");
-  if (!popup.classList.contains("oculto")) {
-    const clicDentroPopup = popup.contains(event.target);
-    const clicEnAddBtn = event.target.closest('#add-image-btn');
+document.addEventListener("click", (event) => {
+  if (!popupOpciones.classList.contains("oculto")) {
+    const clicDentroPopup = popupOpciones.contains(event.target);
+    const clicEnAddBtn = event.target.closest("#add-image-btn");
     const clicEnAgregarMas = event.target.closest('button[onclick="abrirSelectorImagen()"]');
     if (!clicDentroPopup && !clicEnAddBtn && !clicEnAgregarMas) {
-      popup.classList.add("oculto");
+      popupOpciones.classList.add("oculto");
     }
   }
 });
 
-// Función para abrir el popup menú opciones
-function abrirSelectorImagen() {
-  document.getElementById("popupOpciones").classList.remove("oculto");
+async function subirImagenAlServidor(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const respuesta = await fetch(API_UPLOAD_URL, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!respuesta.ok) throw new Error("Error al subir la imagen");
+
+  const data = await respuesta.json();
+  return data.url;
 }
 
-// Usar archivo local
-function usarArchivo() {
-  document.getElementById("inputImagen").click();
-  document.getElementById("popupOpciones").classList.add("oculto");
+async function cargarImagenesGuardadas() {
+  try {
+    const resp = await fetch(API_LIST_URL);
+    if (!resp.ok) throw new Error("No se pudieron cargar imágenes");
+    const urls = await resp.json();
+    urls.forEach((url) => agregarImagenCarrusel(url));
+  } catch (e) {
+    console.warn(e);
+  }
 }
 
-// Iniciar cámara para tomar foto
-function iniciarCamara() {
-  const camara = document.getElementById("camaraContenedor");
-  camara.classList.remove("oculto");
-  document.getElementById("popupOpciones").classList.add("oculto");
-
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(s => {
-      stream = s;
-      document.getElementById("video").srcObject = stream;
-    })
-    .catch(() => {
-      alert("No se pudo acceder a la cámara.");
-    });
-}
-
-// Capturar foto de la cámara y agregar al carrusel
-function capturarFoto() {
-  const video = document.getElementById("video");
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const url = canvas.toDataURL("image/png");
-
-  agregarImagenCarrusel(url);
-
-  document.getElementById("camaraContenedor").classList.add("oculto");
-  if (stream) stream.getTracks().forEach(t => t.stop());
-}
-
-// Evento input archivo seleccionado
-document.getElementById("inputImagen").addEventListener("change", function(e) {
+document.getElementById("inputImagen").addEventListener("change", async function (e) {
   const archivo = e.target.files[0];
   if (archivo) {
-    const url = URL.createObjectURL(archivo);
-    agregarImagenCarrusel(url);
+    try {
+      const urlGuardada = await subirImagenAlServidor(archivo);
+      agregarImagenCarrusel(urlGuardada);
+    } catch (error) {
+      alert("Error al subir la imagen: " + error.message);
+    }
     this.value = "";
   }
 });
 
-// Mostrar mapa y consultar clima (igual que antes)
-function mostrarMapa() {
-  const contenedor = document.getElementById("mapaContenedor");
-  contenedor.classList.add("visible");
-  contenedor.classList.remove("oculto");
-
-  if (!map) {
-    map = L.map('map').setView([19.89, -100.45], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    map.on('click', async function(e) {
-      coordsSeleccionadas = e.latlng;
-      if (marker) map.removeLayer(marker);
-      marker = L.marker([coordsSeleccionadas.lat, coordsSeleccionadas.lng]).addTo(map);
-
-      const hour = document.getElementById("hour")?.value.padStart(2, '0') || "12";
-      const today = new Date().toISOString().split("T")[0];
-      const fullDateTime = `${today}T${hour}:00`;
-
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coordsSeleccionadas.lat}&longitude=${coordsSeleccionadas.lng}&hourly=temperature_2m,weather_code&timezone=auto&start_date=${today}&end_date=${today}`;
-
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        const index = data.hourly.time.findIndex(t => t === fullDateTime);
-
-        if (index === -1) {
-          document.getElementById("weatherCard").textContent = "No hay clima disponible.";
-          return;
-        }
-
-        const temp = data.hourly.temperature_2m[index];
-        const code = data.hourly.weather_code[index];
-        const description = {
-          0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
-          45: "Niebla", 48: "Niebla con escarcha", 51: "Llovizna ligera", 53: "Llovizna moderada",
-          55: "Llovizna densa", 61: "Lluvia ligera", 63: "Lluvia moderada", 65: "Lluvia intensa",
-          80: "Chubascos ligeros", 81: "Chubascos moderados", 82: "Chubascos intensos"
-        }[code] || "Clima desconocido";
-
-        document.getElementById("weatherCard").textContent =
-          `Clima a las ${hour}:00 → ${description}, ${temp}°C`;
-      } catch {
-        document.getElementById("weatherCard").textContent = "Error al consultar clima.";
-      }
-    });
-  }
+// Convertir imagen a base64
+function convertirImgABase64(url) {
+  return new Promise((resolve, reject) => {
+    if (url.startsWith("data:image")) {
+      resolve(url);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = function () {
+      const canvas = document.createElement("canvas");
+      canvas.width = this.width;
+      canvas.height = this.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(this, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = function () {
+      reject(new Error("No se pudo cargar la imagen para convertir."));
+    };
+    img.src = url;
+  });
 }
 
-// Guardar ubicación del mapa
-document.getElementById("establecerUbicacion").addEventListener("click", () => {
-  if (!coordsSeleccionadas) {
-    alert("Selecciona una ubicación primero.");
-    return;
-  }
-  alert(`Ubicación guardada: ${coordsSeleccionadas.lat.toFixed(4)}, ${coordsSeleccionadas.lng.toFixed(4)}`);
-  document.getElementById("mapaContenedor").classList.remove("visible");
-});
-
-// Enviar outfits uno a uno al backend
+// Enviar outfits a API uno a uno
 async function enviarOutfits() {
   const resultadosDiv = document.getElementById("resultadosAPI");
   resultadosDiv.innerHTML = "Enviando outfits...<br>";
 
-  const images = Array.from(document.querySelectorAll(".carousel-item img")).filter(img => {
-    return !img.parentElement.classList.contains("mas");
-  });
+  const images = Array.from(document.querySelectorAll(".carousel-item img")).filter(
+    (img) => !img.parentElement.classList.contains("mas")
+  );
 
   if (images.length === 0) {
     resultadosDiv.innerHTML = "No hay imágenes para enviar.";
@@ -224,13 +196,13 @@ async function enviarOutfits() {
       const base64 = await convertirImgABase64(images[i].src);
 
       const payload = {
-        base64_image: base64.split(",")[1] // quitar "data:image/png;base64,"
+        base64_image: base64.split(",")[1],
       };
 
       const respuesta = await fetch(URL_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!respuesta.ok) {
@@ -248,32 +220,12 @@ async function enviarOutfits() {
   resultadosDiv.innerHTML += "<br>Proceso terminado.";
 }
 
-// Convertir URL imagen a base64
-function convertirImgABase64(url) {
-  return new Promise((resolve, reject) => {
-    if (url.startsWith("data:image")) {
-      resolve(url);
-      return;
-    }
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.onload = function() {
-      const canvas = document.createElement("canvas");
-      canvas.width = this.width;
-      canvas.height = this.height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(this, 0, 0);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = function() {
-      reject(new Error("No se pudo cargar la imagen para convertir."));
-    };
-    img.src = url;
-  });
+// Inicializar al cargar la página
+window.onload = () => {
+  cargarImagenesGuardadas().then(() => posicionarCarrusel());
+};
+
+function usarArchivo() {
+  document.getElementById("inputImagen").click();
+  document.getElementById("popupOpciones").classList.add("oculto");
 }
-
-// Asociar evento al botón enviar outfits
-document.getElementById("btnEnviarOutfits").addEventListener("click", enviarOutfits);
-
-// Inicializar carrusel al cargar la página
-window.onload = () => posicionarCarrusel();
