@@ -1,8 +1,13 @@
 const carousel = document.getElementById("carousel");
 const popupOpciones = document.getElementById("popupOpciones");
+const camaraContenedor = document.getElementById("camaraContenedor");
+const video = document.getElementById("video");
+const inputImagen = document.getElementById("inputImagen");
 const API_UPLOAD_URL = "http://localhost:3000/upload";
 const API_LIST_URL = "http://localhost:3000/images";
 const URL_API = "TU_API_KEY_AQUI"; // Cambia por tu API real
+
+let stream = null;
 
 function posicionarCarrusel(indiceSeleccionado = null) {
   const items = carousel.querySelectorAll(".carousel-item");
@@ -57,7 +62,6 @@ function agregarImagenCarrusel(url) {
 
   imgContainer.appendChild(img);
 
-  // Barra inferior con botón eliminar
   const deleteBar = document.createElement("div");
   deleteBar.classList.add("delete-bar");
 
@@ -80,6 +84,7 @@ function agregarImagenCarrusel(url) {
       }
       nuevoDiv.remove();
       posicionarCarrusel();
+      await fetch("http://localhost:3000/reordenar", { method: "POST" });
     } catch (error) {
       alert("Error al eliminar la imagen: " + error.message);
     }
@@ -99,22 +104,74 @@ function abrirSelectorImagen() {
   popupOpciones.classList.remove("oculto");
 }
 
-document.getElementById("add-image-btn").onclick = abrirSelectorImagen;
+function usarArchivo() {
+  inputImagen.click();
+}
 
-document.addEventListener("click", (event) => {
-  if (!popupOpciones.classList.contains("oculto")) {
-    const clicDentroPopup = popupOpciones.contains(event.target);
-    const clicEnAddBtn = event.target.closest("#add-image-btn");
-    const clicEnAgregarMas = event.target.closest('button[onclick="abrirSelectorImagen()"]');
-    if (!clicDentroPopup && !clicEnAddBtn && !clicEnAgregarMas) {
-      popupOpciones.classList.add("oculto");
+inputImagen.addEventListener("change", async function (e) {
+  const archivo = e.target.files[0];
+  if (archivo) {
+    try {
+      const urlGuardada = await subirBlobAlServidor(archivo);
+      agregarImagenCarrusel(urlGuardada);
+    } catch (error) {
+      alert("Error al subir la imagen: " + error.message);
     }
+    this.value = "";
+    popupOpciones.classList.add("oculto");
   }
 });
 
-async function subirImagenAlServidor(file) {
+// Abre cámara y pide permiso correctamente
+async function iniciarCamara() {
+  popupOpciones.classList.add("oculto");
+  camaraContenedor.classList.remove("oculto");
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    video.srcObject = stream;
+    await video.play();
+  } catch (err) {
+    alert("No se pudo acceder a la cámara: " + err.message);
+    cerrarCamara();
+  }
+}
+
+function capturarFoto() {
+  if (!stream) {
+    alert("La cámara no está iniciada");
+    return;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  canvas.toBlob(async (blob) => {
+    if (blob) {
+      try {
+        const urlGuardada = await subirBlobAlServidor(blob);
+        agregarImagenCarrusel(urlGuardada);
+      } catch (error) {
+        alert("Error al subir la foto: " + error.message);
+      }
+    }
+  }, "image/png");
+
+  cerrarCamara();
+}
+
+function cerrarCamara() {
+  camaraContenedor.classList.add("oculto");
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+}
+
+async function subirBlobAlServidor(blob) {
   const formData = new FormData();
-  formData.append("image", file);
+  formData.append("image", blob, "foto.png");
 
   const respuesta = await fetch(API_UPLOAD_URL, {
     method: "POST",
@@ -132,26 +189,20 @@ async function cargarImagenesGuardadas() {
     const resp = await fetch(API_LIST_URL);
     if (!resp.ok) throw new Error("No se pudieron cargar imágenes");
     const urls = await resp.json();
-    urls.forEach((url) => agregarImagenCarrusel(url));
+
+    const btnAgregar = document.getElementById("add-image-btn");
+    const carouselElem = btnAgregar.parentElement;
+    Array.from(carouselElem.querySelectorAll(".carousel-item")).forEach(item => {
+      if (!item.classList.contains("mas")) item.remove();
+    });
+
+    urls.forEach(url => agregarImagenCarrusel(url));
+    posicionarCarrusel();
   } catch (e) {
     console.warn(e);
   }
 }
 
-document.getElementById("inputImagen").addEventListener("change", async function (e) {
-  const archivo = e.target.files[0];
-  if (archivo) {
-    try {
-      const urlGuardada = await subirImagenAlServidor(archivo);
-      agregarImagenCarrusel(urlGuardada);
-    } catch (error) {
-      alert("Error al subir la imagen: " + error.message);
-    }
-    this.value = "";
-  }
-});
-
-// Convertir imagen a base64
 function convertirImgABase64(url) {
   return new Promise((resolve, reject) => {
     if (url.startsWith("data:image")) {
@@ -175,13 +226,12 @@ function convertirImgABase64(url) {
   });
 }
 
-// Enviar outfits a API uno a uno
 async function enviarOutfits() {
   const resultadosDiv = document.getElementById("resultadosAPI");
   resultadosDiv.innerHTML = "Enviando outfits...<br>";
 
   const images = Array.from(document.querySelectorAll(".carousel-item img")).filter(
-    (img) => !img.parentElement.classList.contains("mas")
+    img => !img.parentElement.classList.contains("mas")
   );
 
   if (images.length === 0) {
@@ -195,9 +245,7 @@ async function enviarOutfits() {
     try {
       const base64 = await convertirImgABase64(images[i].src);
 
-      const payload = {
-        base64_image: base64.split(",")[1],
-      };
+      const payload = { base64_image: base64.split(",")[1] };
 
       const respuesta = await fetch(URL_API, {
         method: "POST",
@@ -220,12 +268,35 @@ async function enviarOutfits() {
   resultadosDiv.innerHTML += "<br>Proceso terminado.";
 }
 
-// Inicializar al cargar la página
+document.getElementById("add-image-btn").onclick = abrirSelectorImagen;
+
+document.addEventListener("click", (event) => {
+  if (!popupOpciones.classList.contains("oculto")) {
+    const clicDentroPopup = popupOpciones.contains(event.target);
+    const clicEnAddBtn = event.target.closest("#add-image-btn");
+    const clicEnAgregarMas = event.target.closest('button[onclick="abrirSelectorImagen()"]');
+    if (!clicDentroPopup && !clicEnAddBtn && !clicEnAgregarMas) {
+      popupOpciones.classList.add("oculto");
+    }
+  }
+});
+
+function abrirSelectorImagen() {
+  popupOpciones.classList.remove("oculto");
+}
+
+window.abrirSelectorImagen = abrirSelectorImagen;
+window.iniciarCamara = iniciarCamara;
+window.capturarFoto = capturarFoto;
+window.usarArchivo = usarArchivo;
+window.enviarOutfits = enviarOutfits;
+
 window.onload = () => {
-  cargarImagenesGuardadas().then(() => posicionarCarrusel());
+  cargarImagenesGuardadas();
 };
 
 function usarArchivo() {
   document.getElementById("inputImagen").click();
   document.getElementById("popupOpciones").classList.add("oculto");
 }
+
